@@ -3,8 +3,9 @@ import { getConfig } from '../lib/config.js';
 import { log, sleep, isSocketHangupError } from '../lib/utils.js';
 
 const COOLDOWN = 3600; // 1 hour in seconds
+const MAX_CONSECUTIVE_AUTH_ERRORS = 5;
 
-export async function botCommand(options) {
+export async function botCommand(options, consecutiveAuthErrors = 0, isFirstRun = true) {
   const config = getConfig();
   const bot = new Bot(config, { dryRun: options.dryRun });
   let currentBookedDate = options.current;
@@ -23,6 +24,11 @@ export async function botCommand(options) {
 
   if (minDate) {
     log(`Minimum date: ${minDate}`);
+  }
+
+  // Send startup notification only on first run
+  if (isFirstRun) {
+    await bot.sendStartupNotification();
   }
 
   try {
@@ -60,9 +66,19 @@ export async function botCommand(options) {
     if (isSocketHangupError(err)) {
       log(`Socket hangup error: ${err.message}. Trying again after ${COOLDOWN} seconds...`);
       await sleep(COOLDOWN);
+      return botCommand(options, 0, false); // Reset auth error counter on socket errors, not first run
     } else {
-      log(`Session/authentication error: ${err.message}. Retrying immediately...`);
+      // Check if we've hit max consecutive auth errors
+      if (consecutiveAuthErrors >= MAX_CONSECUTIVE_AUTH_ERRORS) {
+        log(`ERROR: Hit maximum consecutive authentication errors (${MAX_CONSECUTIVE_AUTH_ERRORS}). Stopping.`);
+        log(`Please check your credentials, SCHEDULE_ID, FACILITY_ID, and network connection.`);
+        log(`Error details: ${err.message}`);
+        process.exit(1);
+      }
+
+      log(`Session/authentication error: ${err.message}. Retrying immediately... (attempt ${consecutiveAuthErrors + 1}/${MAX_CONSECUTIVE_AUTH_ERRORS})`);
+      await sleep(2); // Small delay to avoid hammering the server
+      return botCommand(options, consecutiveAuthErrors + 1, false); // Not first run
     }
-    return botCommand(options);
   }
 }

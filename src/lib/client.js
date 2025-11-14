@@ -78,51 +78,92 @@ export class VisaHttpClient {
 
   // Private request methods
   async _anonymousRequest(url, headers = {}) {
-    return fetch(url, {
-      headers: {
-        "User-Agent": "",
-        "Accept": "*/*",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        ...headers
-      }
+    const requestHeaders = {
+      "User-Agent": "",
+      "Accept": "*/*",
+      "Accept-Encoding": "gzip, deflate, br",
+      "Connection": "keep-alive",
+      ...headers
+    };
+
+    log(`[HTTP GET] ${url}`);
+
+    const response = await fetch(url, {
+      headers: requestHeaders
     });
+
+    return response;
   }
 
   async _jsonRequest(url, headers = {}) {
-    return fetch(url, {
-      headers: {
-        ...headers,
-        "Accept": "application/json",
-        "X-Requested-With": "XMLHttpRequest"
-      },
+    const requestHeaders = {
+      ...headers,
+      "Accept": "application/json",
+      "X-Requested-With": "XMLHttpRequest"
+    };
+
+    log(`[HTTP GET JSON] ${url}`);
+
+    const response = await fetch(url, {
+      headers: requestHeaders,
       cache: "no-store"
-    })
-      .then(r => r.json())
-      .then(r => this._handleErrors(r));
+    });
+
+    // Check if response is OK
+    if (!response.ok) {
+      const text = await response.text();
+      log(`API request failed with status ${response.status}: ${text.substring(0, 200)}`);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    // Check content type before parsing JSON
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      log(`Expected JSON but got content-type: ${contentType}`);
+      log(`Response preview: ${text.substring(0, 200)}`);
+      throw new Error(`Expected JSON response but got ${contentType || 'unknown content type'}`);
+    }
+
+    const data = await response.json();
+    return this._handleErrors(data);
   }
 
   async _submitForm(url, headers = {}, formData = {}) {
-    return fetch(url, {
+    const requestHeaders = {
+      ...headers,
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+    };
+    const body = new URLSearchParams(formData);
+
+    log(`[HTTP POST] ${url}`);
+
+    const response = await fetch(url, {
       method: "POST",
-      headers: {
-        ...headers,
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
-      },
-      body: new URLSearchParams(formData)
+      headers: requestHeaders,
+      body: body
     });
+
+    return response;
   }
 
   async _submitFormWithRedirect(url, headers = {}, formData = {}) {
-    return fetch(url, {
+    const requestHeaders = {
+      ...headers,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    };
+    const body = new URLSearchParams(formData);
+
+    log(`[HTTP POST WITH REDIRECT] ${url}`);
+
+    const response = await fetch(url, {
       method: "POST",
       redirect: "follow",
-      headers: {
-        ...headers,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams(formData)
+      headers: requestHeaders,
+      body: body
     });
+
+    return response;
   }
 
   // Private utility methods
