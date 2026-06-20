@@ -94,7 +94,7 @@ export class TelegramNotifier {
       return null;
     }
 
-    const title = '🤖 US Visa Bot Started';
+    const title = `🤖 US Visa Bot Started for ${config.email}`;
     const timestamp = new Date().toISOString();
     const fields = [
       `Country: ${config.countryCode.toUpperCase()}`,
