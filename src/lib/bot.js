@@ -36,20 +36,6 @@ export class Bot {
       return null;
     }
 
-    // Send notification about available dates (successful API response)
-    try {
-      await this.notifier.sendAvailableDates(
-        dates,
-        this.config.facilityId,
-        currentBookedDate,
-        this.config.scheduleId,
-        this.config.countryCode
-      );
-    } catch (error) {
-      log(`Failed to send Telegram notification: ${error.message}`);
-      // Don't fail the whole process if notification fails
-    }
-
     // Filter dates that are better than current booked date and after minimum date
     const goodDates = dates.filter(date => {
       if (date >= currentBookedDate) {
@@ -68,6 +54,19 @@ export class Bot {
     if (goodDates.length === 0) {
       log("no good dates found after filtering");
       return null;
+    }
+
+    try {
+      await this.notifier.sendAvailableDates(
+        goodDates,
+        this.config.facilityId,
+        currentBookedDate,
+        this.config.scheduleId,
+        this.config.countryCode
+      );
+    } catch (error) {
+      log(`Failed to send Telegram notification: ${error.message}`);
+      // Don't fail the whole process if notification fails
     }
 
     // Sort dates and return the earliest one
